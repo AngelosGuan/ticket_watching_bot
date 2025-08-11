@@ -106,8 +106,7 @@ def check_once():
         })
 
         try:
-            page.goto(TARGET_URL, wait_until="networkidle", timeout=120000)  # wait for network to go idle
-            page.wait_for_load_state("networkidle")
+            page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=120000)  # wait for network to go idle
             page.wait_for_timeout(5000)  # extra wait for JS to fully render content
             # allow client-side content to render; then settle network
 
