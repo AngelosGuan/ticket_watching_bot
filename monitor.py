@@ -22,12 +22,16 @@ POSITIVE_TRIGGERS = [
     "Tickets Available",
     "Standard Tickets",
     "Available now",
+    "buy",
+    "purchase"
 ]
 NEGATIVE_BLOCKERS = [
     "Tickets not available at this time",
     "Check back later",
     "No tickets available",
     "On sale soon",
+    "Tickets are sold out now",
+    "Check back soon"
 ]
 
 def now_iso():
