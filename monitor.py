@@ -23,7 +23,6 @@ POSITIVE_TRIGGERS = [
     "Standard Tickets",
     "Available now",
     "$",
-    "Row",
     "Standard Admission"
 ]
 NEGATIVE_BLOCKERS = [
@@ -32,7 +31,9 @@ NEGATIVE_BLOCKERS = [
     "No tickets available",
     "On sale soon",
     "Tickets are sold out now",
-    "Check back soon"
+    "Check back soon",
+    "sold out",
+    "Tickets are sold out now. Check back soon."
 ]
 
 def now_iso():
@@ -78,6 +79,7 @@ def page_signals(page) -> dict:
         except:
             pass
 
+
     # Extra regex safety for the sold-out banner
     try:
         if page.locator("text=/Tickets\\s+are\\s+sold\\s+out\\s+now\\.?/i").count() > 0:
@@ -85,6 +87,15 @@ def page_signals(page) -> dict:
                 neg_hits.append("Tickets are sold out now")
     except:
         pass
+
+    if not bool(neg_hits):
+        try:
+            page.screenshot(path="tm_debug.png", full_page=True)
+            with open("tm_dump.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            print("[DBG] Saved tm_debug.png and tm_dump.html")
+        except Exception as e:
+            print(f"[DBG] Artifact save failed: {e}")
 
     return {
         "positive": bool(pos_hits),
