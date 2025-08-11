@@ -22,8 +22,9 @@ POSITIVE_TRIGGERS = [
     "Tickets Available",
     "Standard Tickets",
     "Available now",
-    "buy",
-    "purchase"
+    "$",
+    "Row",
+    "Standard Admission"
 ]
 NEGATIVE_BLOCKERS = [
     "Tickets not available at this time",
@@ -55,19 +56,42 @@ def send_discord(message: str):
         print(f"[ERR] Discord webhook exception: {e}")
 
 def page_signals(page) -> dict:
-    result = {"positive": False, "positive_hit": None, "negative": False, "negative_hit": None}
-    body_text = page.inner_text("body")
+    """
+    Use Playwright's visible-text search so we catch text rendered
+    in dynamic or shadow DOM containers.
+    """
+    # Positive
+    pos_hits = []
     for phrase in POSITIVE_TRIGGERS:
-        if phrase.lower() in body_text.lower():
-            result["positive"] = True
-            result["positive_hit"] = phrase
-            break
+        try:
+            if page.get_by_text(phrase, exact=False).count() > 0:
+                pos_hits.append(phrase)
+        except:
+            pass
+
+    # Negative (sold-out, check-back, etc.)
+    neg_hits = []
     for phrase in NEGATIVE_BLOCKERS:
-        if phrase.lower() in body_text.lower():
-            result["negative"] = True
-            result["negative_hit"] = phrase
-            break
-    return result
+        try:
+            if page.get_by_text(phrase, exact=False).count() > 0:
+                neg_hits.append(phrase)
+        except:
+            pass
+
+    # Extra regex safety for the sold-out banner
+    try:
+        if page.locator("text=/Tickets\\s+are\\s+sold\\s+out\\s+now\\.?/i").count() > 0:
+            if "Tickets are sold out now" not in neg_hits:
+                neg_hits.append("Tickets are sold out now")
+    except:
+        pass
+
+    return {
+        "positive": bool(pos_hits),
+        "positive_hit": ", ".join(pos_hits) or None,
+        "negative": bool(neg_hits),
+        "negative_hit": ", ".join(neg_hits) or None
+    }
 
 def check_once():
     with sync_playwright() as p:
@@ -77,14 +101,23 @@ def check_once():
         )
         page = context.new_page()
         page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
         })
 
         try:
-            page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=120000)
-            page.wait_for_timeout(4000)
+            page.goto(TARGET_URL, wait_until="networkidle", timeout=120000)  # wait for network to go idle
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(5000)  # extra wait for JS to fully render content
+            # allow client-side content to render; then settle network
+
+            # try to dismiss cookie banners if present
+            for sel in ["button:has-text('Accept')", "text=/Accept( All)?/i", "text=/Agree/i"]:
+                try:
+                    page.locator(sel).first.click(timeout=1500)
+                    break
+                except:
+                    pass
         except PWTimeout:
             context.close()
             return {"ok": False, "error": "timeout loading"}
@@ -105,9 +138,9 @@ def main():
             sig = result["signals"]
             pos, pos_hit = sig["positive"], sig["positive_hit"]
             neg, neg_hit = sig["negative"], sig["negative_hit"]
-
             print(f"[{now_iso()}] positive={pos} ({pos_hit})  negative={neg} ({neg_hit})")
 
+            # Alert only when we see a positive and no negatives
             if not neg and pos and not alerted_once:
                 msg = (
                     "**Ticketmaster update detected**\n"
