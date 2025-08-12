@@ -112,7 +112,7 @@ def page_signals(page) -> dict:
         "positive": bool(pos_hits),
         "positive_hit": ", ".join(pos_hits) or None,
         "negative": bool(neg_hits),
-        "negative_hit": ", ".join(neg_hits) or None
+        "negative_hit": ", ".join(neg_hits) or None,
         "file": files
     }
 
