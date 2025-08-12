@@ -44,13 +44,18 @@ def jitter_sleep():
     seconds = max(60, int((minutes + random.uniform(-0.5, 0.5)) * 60))
     return seconds
 
-def send_discord(message: str):
+def send_discord(message: str, files: list = None):
     if not DISCORD_WEBHOOK_URL:
         print("[WARN] DISCORD_WEBHOOK_URL is empty; printing instead:\n", message)
         return
     payload = {"content": message[:1900]}
     try:
-        r = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=15)
+        if files:
+            # When uploading files, Discord expects 'payload_json' for the message body.
+            data = {"payload_json": json.dumps({"content": message[:1900]})}
+            r = requests.post(DISCORD_WEBHOOK_URL, data=data, files=files, timeout=30)
+        else:
+            r = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=15)
         if r.status_code >= 300:
             print(f"[ERR] Discord webhook error: {r.status_code} {r.text}")
     except Exception as e:
@@ -88,20 +93,27 @@ def page_signals(page) -> dict:
     except:
         pass
 
+    files = None
+
     if not bool(neg_hits):
         try:
-            page.screenshot(path="tm_debug.png", full_page=True)
-            with open("tm_dump.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
-            print("[DBG] Saved tm_debug.png and tm_dump.html")
+            png_path = "tm_debug.png"
+            page.screenshot(path=png_path, full_page=True)
+            print("[DBG] Saved tm_debug.png")
         except Exception as e:
             print(f"[DBG] Artifact save failed: {e}")
+        try:
+            files = []
+            files.append(("file", (png_path, open(png_path, "rb"), "image/png")))
+        except Exception as e:
+            print(f"[DBG] Could not attach screenshot: {e}")
 
     return {
         "positive": bool(pos_hits),
         "positive_hit": ", ".join(pos_hits) or None,
         "negative": bool(neg_hits),
         "negative_hit": ", ".join(neg_hits) or None
+        "file": files
     }
 
 def check_once():
@@ -159,7 +171,7 @@ def main():
                     f"- Time (UTC): {now_iso()}\n"
                     "\nIf this is a false positive, the site may be A/B testing text. Double-check manually."
                 )
-                send_discord(msg)
+                send_discord(msg, result["file"])
                 alerted_once = True
 
         sleep_s = jitter_sleep()
