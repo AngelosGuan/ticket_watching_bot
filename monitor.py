@@ -11,8 +11,8 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1404567050042736761/ZP67
 TARGET_URL = "https://www.ticketmaster.com/sleep-token-even-in-arcadia-duluth-georgia-09-16-2025/event/0E00626ABEEB28A5"
 
 # Check every ~45 minutes with jitter
-SLEEP_MIN_MINUTES = 40
-SLEEP_MAX_MINUTES = 55
+SLEEP_MIN_MINUTES = 10
+SLEEP_MAX_MINUTES = 20
 
 # Phrases that usually indicate availability
 POSITIVE_TRIGGERS = [
